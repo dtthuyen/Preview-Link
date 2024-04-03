@@ -2,6 +2,7 @@ import { decode } from 'html-entities'
 import { Image } from 'react-native'
 
 import { PreviewData, PreviewDataImage, Size } from './types'
+import { getPlainText } from '@base/core'
 
 export const getActualImageUrl = (baseUrl: string, imageUrl?: string) => {
   let actualImageUrl = imageUrl?.trim()
@@ -60,19 +61,25 @@ export const getPreviewData = async (text: string, requestTimeout = 5000) => {
     image: undefined,
     link: undefined,
     title: undefined,
+    domain: undefined
   }
 
   try {
-    const textWithoutEmails = text.replace(REGEX_EMAIL, '').trim()
+    const textWithoutEmails = getPlainText(text).replace(REGEX_EMAIL, '').trim()
 
     if (!textWithoutEmails) return previewData
-
+    
     const link = textWithoutEmails.match(REGEX_LINK)?.[0]
-
+    
+    try {
+      const _url = require("url").parse(link, true);
+      if(_url.hostname) previewData.domain = _url.hostname;
+    } catch (e) {}
+    
     if (!link) return previewData
-
+    
     let url = link
-
+    
     if (!url.toLowerCase().startsWith('http')) {
       url = 'https://' + url
     }
@@ -111,10 +118,10 @@ export const getPreviewData = async (text: string, requestTimeout = 5000) => {
 
     // Some pages return undefined
     if (!html) return previewData
-
+    
     const head = html.substring(0, html.indexOf('<body'))
-
     // Get page title
+    // const title = head.match(REGEX_TITLE)
     const title = REGEX_TITLE.exec(head)
     previewData.title = getHtmlEntitiesDecodedText(title?.[1])
 
@@ -154,7 +161,7 @@ export const getPreviewData = async (text: string, requestTimeout = 5000) => {
       },
       { title: previewData.title }
     )
-
+    
     previewData.description = metaPreviewData.description
     previewData.image = await getPreviewDataImage(metaPreviewData.imageUrl)
     previewData.title = metaPreviewData.title
@@ -217,8 +224,8 @@ export const REGEX_EMAIL = /([a-zA-Z0-9+._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g
 export const REGEX_IMAGE_CONTENT_TYPE = /image\/*/g
 // Consider empty line after img tag and take only the src field, space before to not match data-src for example
 export const REGEX_IMAGE_TAG = /<img[\n\r]*.*? src=["'](.*?)["']/g
-export const REGEX_LINK =
-  /((http|ftp|https):\/\/)?([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?/i
+export const REGEX_LINK =/((http|https|ws|wss):\/\/)?[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}(\/[^\s]*)?/gi
+// /((http|ftp|https|ws|wss):\/\/)?([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?/i
 // Some pages write content before the name/property, some use single quotes instead of double
 export const REGEX_META =
   /<meta.*?(property|name)=["'](.*?)["'].*?content=["'](.*?)["'].*?>/g
