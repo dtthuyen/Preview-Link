@@ -3,6 +3,7 @@ export interface PreviewData {
   image?: PreviewDataImage
   link?: string
   title?: string
+  domain?: string
 }
 
 export interface PreviewDataImage {
